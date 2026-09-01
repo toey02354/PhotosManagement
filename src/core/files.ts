@@ -32,14 +32,17 @@ export async function scanFolder(folder: string, recursive = false): Promise<Fil
 }
 
 function sourcePriority(extension: string): number {
-  return ({ '.heic': 0, '.dng': 1, '.jpg': 2, '.jpeg': 2, '.tif': 3, '.tiff': 3, '.png': 4 } as Record<string, number>)[extension] ?? 99
+  return ({
+    '.heic': 0, '.dng': 1, '.jpg': 2, '.jpeg': 2, '.tif': 3, '.tiff': 3, '.png': 4,
+    '.mov': 10, '.mp4': 11, '.m4v': 12,
+  } as Record<string, number>)[extension] ?? 99
 }
 
 export function buildSourceIndex(records: FileRecord[]) {
   const candidates = new Map<string, FileRecord[]>()
   for (const record of records) {
     const key = iphoneSequenceKey(record.filename)
-    if (!IMAGE_EXTENSIONS.has(record.extension) || !key || !isAuthoritativeIphoneOriginal(record.filename)) continue
+    if (!SUPPORTED_EXTENSIONS.has(record.extension) || !key || !isAuthoritativeIphoneOriginal(record.filename)) continue
     candidates.set(key, [...(candidates.get(key) ?? []), record])
   }
   const sourceByKey = new Map<string, FileRecord>()

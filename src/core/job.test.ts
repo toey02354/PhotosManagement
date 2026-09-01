@@ -63,4 +63,17 @@ describe('Node job engine', () => {
     expect(summary).toContain('Confident source matches     : 1')
     expect(summary).toContain('Would sync Finder dates      : 1')
   })
+
+  it('falls back to a matching Live Photo MOV source', async () => {
+    const target = await folder(), source = await folder()
+    await writeFile(join(target, 'IMG_2741_Original.jpg'), 'derived')
+    await writeFile(join(source, 'IMG_2741_Original.mov'), 'live-video')
+    const config = options(target, true)
+    config.convertBuddhistEra = false
+    config.sourceFolder = source
+    config.syncFinderDates = true
+    const summary = await run(config)
+    expect(summary).toContain('Confident source matches     : 1')
+    expect(summary).toContain('Would sync Finder dates      : 1')
+  })
 })
