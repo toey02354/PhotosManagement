@@ -7,6 +7,7 @@ Electron + React + TypeScript successor to `rename_createddate_livephoto_gui_v9.
 Requires Node.js 22.12 or newer.
 
 ```bash
+nvm use
 npm install
 npm run dev
 ```
