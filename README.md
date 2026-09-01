@@ -1,6 +1,6 @@
 # Photos Management
 
-Electron + React + TypeScript successor to `rename_createddate_livephoto_gui_v9.py`.
+Electron + React + TypeScript photo management desktop app.
 
 ## Development
 
@@ -12,4 +12,4 @@ npm install
 npm run dev
 ```
 
-The desktop shell, sandboxed preload API, v9 option semantics, and processing-engine boundary are initialized. The TypeScript processing engine is currently a safe placeholder: it performs no file mutations until the Python v9 behavior is ported and tested.
+The Node.js processing engine scans and matches originals, previews and applies safe renames, organizes Live Photo videos and conflicts, copies metadata with ExifTool, and synchronizes macOS Finder dates.

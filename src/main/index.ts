@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import { stat } from 'node:fs/promises'
 import { processJob } from '../core/job'
 import type { JobEvent, JobOptions } from '../shared/job'
 
@@ -39,7 +40,15 @@ app.whenReady().then(() => {
 
   const startJob = async (event: Electron.IpcMainInvokeEvent, options: JobOptions) => {
     const emit = (jobEvent: JobEvent) => event.sender.send('job:event', jobEvent)
-    await processJob(options, emit)
+    try {
+      if (!(await stat(options.targetFolder)).isDirectory()) throw new Error('Please choose a valid Target Folder.')
+      if ((options.copyMetadata || options.syncFinderDates) && !(await stat(options.sourceFolder)).isDirectory()) {
+        throw new Error('Please choose a valid Metadata Source Folder.')
+      }
+      await processJob(options, emit)
+    } catch (error) {
+      emit({ type: 'error', message: error instanceof Error ? error.message : String(error) })
+    }
   }
   ipcMain.handle('job:preview', startJob)
   ipcMain.handle('job:run', startJob)
