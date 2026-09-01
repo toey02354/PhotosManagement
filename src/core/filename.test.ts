@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   convertBuddhistEraDatePrefix,
   iphoneSequenceKey,
+  isAuthoritativeIphoneOriginal,
   isCanonicalIphoneOriginal,
   normalizeFilename,
   stripDatePrefix,
@@ -36,5 +37,11 @@ describe('v9 filename behavior', () => {
     expect(isCanonicalIphoneOriginal('IMG_0415.HEIC')).toBe(true)
     expect(isCanonicalIphoneOriginal('20250104-IMG_0415.jpg')).toBe(true)
     expect(isCanonicalIphoneOriginal('IMG_0415_Original.jpg')).toBe(false)
+  })
+
+  it('accepts explicitly labeled originals as metadata sources', () => {
+    expect(isAuthoritativeIphoneOriginal('IMG_0415_Original.HEIC')).toBe(true)
+    expect(isAuthoritativeIphoneOriginal('20250104-IMG_0415_Original.jpg')).toBe(true)
+    expect(isAuthoritativeIphoneOriginal('IMG_0415-edit.jpg')).toBe(false)
   })
 })

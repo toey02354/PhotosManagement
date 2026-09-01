@@ -21,7 +21,8 @@ describe('source indexing', () => {
     expect(result.ambiguous[0].sources).toHaveLength(2)
   })
 
-  it('ignores derived files as authoritative sources', () => {
-    expect(buildSourceIndex([record('IMG_0415_Original.jpg', '.jpg')]).sourceByKey.size).toBe(0)
+  it('accepts explicitly labeled originals but ignores edited derivatives', () => {
+    expect(buildSourceIndex([record('IMG_0415_Original.jpg', '.jpg')]).sourceByKey.size).toBe(1)
+    expect(buildSourceIndex([record('IMG_0415-edit.jpg', '.jpg')]).sourceByKey.size).toBe(0)
   })
 })

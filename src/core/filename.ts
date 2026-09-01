@@ -52,3 +52,10 @@ export function isCanonicalIphoneOriginal(name: string): boolean {
   const stem = clean.slice(0, clean.length - extension.length)
   return /^IMG_\d{4}$/i.test(stem)
 }
+
+export function isAuthoritativeIphoneOriginal(name: string): boolean {
+  const clean = stripDatePrefix(basename(name))
+  const extension = extname(clean)
+  const stem = clean.slice(0, clean.length - extension.length)
+  return /^IMG_\d{4}(?:_Original)?$/i.test(stem)
+}

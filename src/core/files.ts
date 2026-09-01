@@ -1,7 +1,7 @@
 import { access, readdir, realpath, stat } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { extname, join } from 'node:path'
-import { iphoneSequenceKey, isCanonicalIphoneOriginal } from './filename'
+import { iphoneSequenceKey, isAuthoritativeIphoneOriginal } from './filename'
 
 export const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.heic', '.png', '.dng', '.tif', '.tiff'])
 export const VIDEO_EXTENSIONS = new Set(['.mov', '.mp4', '.m4v'])
@@ -39,7 +39,7 @@ export function buildSourceIndex(records: FileRecord[]) {
   const candidates = new Map<string, FileRecord[]>()
   for (const record of records) {
     const key = iphoneSequenceKey(record.filename)
-    if (!IMAGE_EXTENSIONS.has(record.extension) || !key || !isCanonicalIphoneOriginal(record.filename)) continue
+    if (!IMAGE_EXTENSIONS.has(record.extension) || !key || !isAuthoritativeIphoneOriginal(record.filename)) continue
     candidates.set(key, [...(candidates.get(key) ?? []), record])
   }
   const sourceByKey = new Map<string, FileRecord>()

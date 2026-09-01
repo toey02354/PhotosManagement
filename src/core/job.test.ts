@@ -50,4 +50,17 @@ describe('Node job engine', () => {
     expect((await stat(join(target, 'Conflicts', 'IMG_0001.png'))).isFile()).toBe(true)
     expect(summary).toContain('Conflict groups              : 1')
   })
+
+  it('matches an _Original source for Finder date synchronization', async () => {
+    const target = await folder(), source = await folder()
+    await writeFile(join(target, 'IMG_2959_Original.jpg'), 'derived')
+    await writeFile(join(source, 'IMG_2959_Original.HEIC'), 'original')
+    const config = options(target, true)
+    config.convertBuddhistEra = false
+    config.sourceFolder = source
+    config.syncFinderDates = true
+    const summary = await run(config)
+    expect(summary).toContain('Confident source matches     : 1')
+    expect(summary).toContain('Would sync Finder dates      : 1')
+  })
 })

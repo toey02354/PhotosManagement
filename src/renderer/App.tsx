@@ -3,8 +3,8 @@ import type { JobEvent, JobOptions } from '../shared/job'
 
 const initialOptions: JobOptions = {
   targetFolder: '', sourceFolder: '', dryRun: true,
-  addDatePrefix: true, convertBuddhistEra: true, moveLivePhotoVideos: true,
-  copyMetadata: true, syncFinderDates: true, recursiveSource: true,
+  addDatePrefix: false, convertBuddhistEra: false, moveLivePhotoVideos: false,
+  copyMetadata: false, syncFinderDates: false, recursiveSource: false,
 }
 
 export default function App() {
