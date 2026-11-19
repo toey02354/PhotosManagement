@@ -63,6 +63,21 @@ describe('Node job engine', () => {
     expect(summary).toContain('Conflict groups              : 1')
   })
 
+  it('reserves a rename destination once in preview and in the actual run', async () => {
+    const target = await folder()
+    vi.spyOn(metadata, 'getBestCreatedDate').mockResolvedValue(new Date(2024, 11, 21))
+    await writeFile(join(target, '20231221-IMG_4697.JPG'), 'one')
+    await writeFile(join(target, '20221221-IMG_4697.JPG'), 'two')
+    const config = { ...options(target, true), addDatePrefix: true }
+    const preview = await run(config)
+    expect(preview).toContain('Would rename                 : 1')
+    expect(preview).toContain('Rename collisions skipped    : 1')
+    const result = await run({ ...config, dryRun: false })
+    expect(result).toContain('Renamed                      : 1')
+    expect(result).toContain('Rename collisions skipped    : 1')
+    expect(await readdir(target)).toHaveLength(2)
+  })
+
   it('matches an _Original source for Finder date synchronization', async () => {
     const target = await folder(), source = await folder()
     await writeFile(join(target, 'IMG_2959_Original.jpg'), 'derived')

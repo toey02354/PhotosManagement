@@ -61,6 +61,20 @@ export async function processJob(options: JobOptions, emit: (event: JobEvent) =>
     emit({ type: 'progress', current: ++current, total: Math.max(matches.size, 1), label: 'Copying/syncing metadata' })
   }
 
+  const previewDestinations = new Set<string>()
+  const previewVacated = new Set<string>()
+  const pathKey = (path: string) => path.normalize('NFC').toLowerCase()
+  const move = async (source: string, destination: string) => {
+    if (!dryRun) return !await pathExists(destination) && await moveWithoutReplacing(source, destination)
+    const key = pathKey(destination)
+    if (previewDestinations.has(key) || (!previewVacated.has(key) && await pathExists(destination))) return false
+    const sourceKey = pathKey(source)
+    previewDestinations.delete(sourceKey)
+    previewVacated.add(sourceKey)
+    previewDestinations.add(key)
+    return true
+  }
+
   let groupNumber = 0
   for (const [normalized, files] of groups) {
     const sizes = new Set(files.map((file) => file.size)), extensions = new Set(files.map((file) => file.extension))
@@ -100,7 +114,7 @@ export async function processJob(options: JobOptions, emit: (event: JobEvent) =>
       let name = needsRename && renameEnabled ? nextName : file.filename
       let path = join(targetFolder, name)
       if (needsRename && renameEnabled) {
-        if (await pathExists(path) || (!dryRun && !await moveWithoutReplacing(file.path, path))) { stats.nameCollisionSkips++; collisions.push({ source: file.path, destination: path }); name = file.filename; path = file.path }
+        if (!await move(file.path, path)) { stats.nameCollisionSkips++; collisions.push({ source: file.path, destination: path }); name = file.filename; path = file.path }
         else stats.renameActions++
       } else { name = file.filename; path = file.path }
       processed.push({ name, path, pairedVideo: pairedVideos.has(file.path) })
@@ -111,7 +125,7 @@ export async function processJob(options: JobOptions, emit: (event: JobEvent) =>
         await mkdir(liveFolder, { recursive: true })
         if (!(await lstat(liveFolder)).isDirectory()) throw new Error('LivePhotos must be a regular directory.')
       }
-      if (await pathExists(destination) || (!dryRun && !await moveWithoutReplacing(file.path, destination))) {
+      if (!await move(file.path, destination)) {
         stats.liveVideoSkipped++
         liveSkips.push(destination)
       } else stats.liveVideoActions++
