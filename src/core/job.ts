@@ -3,7 +3,7 @@ import { basename, join } from 'node:path'
 import type { JobEvent, JobOptions } from '../shared/job'
 import { convertBuddhistEraDatePrefix, normalizeFilename, stripDatePrefix } from './filename'
 import { buildSourceIndex, IMAGE_EXTENSIONS, matchTargetsToSources, pathExists, scanFolder, VIDEO_EXTENSIONS, type FileRecord } from './files'
-import { copyEmbeddedMetadata, datePrefix, findExiftool, findSetFile, getBestCreatedDate, setFilesystemDates } from './metadata'
+import { copyEmbeddedMetadata, datePrefix, findExiftool, findSetFile, getBestCreatedDate, livePhotoIdentifier, setFilesystemDates } from './metadata'
 
 type Detail = { target: string; source?: string; error?: string; warning?: string }
 const yn = (value: boolean) => value ? 'YES' : 'NO'
@@ -64,13 +64,25 @@ export async function processJob(options: JobOptions, emit: (event: JobEvent) =>
   let groupNumber = 0
   for (const [normalized, files] of groups) {
     const sizes = new Set(files.map((file) => file.size)), extensions = new Set(files.map((file) => file.extension))
-    const live = [...extensions].some((ext) => IMAGE_EXTENSIONS.has(ext)) && [...extensions].some((ext) => VIDEO_EXTENSIONS.has(ext))
-    if (sizes.size > 1 && !live) {
+    const mixedMedia = [...extensions].some((ext) => IMAGE_EXTENSIONS.has(ext)) && [...extensions].some((ext) => VIDEO_EXTENSIONS.has(ext))
+    const pairedVideos = new Set<string>()
+    if (mixedMedia && options.moveLivePhotoVideos) {
+      const identifiers = new Set<string>()
+      for (const file of files.filter((item) => IMAGE_EXTENSIONS.has(item.extension))) {
+        const identifier = await livePhotoIdentifier(file.path, exiftool)
+        if (identifier) identifiers.add(identifier)
+      }
+      for (const file of files.filter((item) => item.extension === '.mov')) {
+        const identifier = await livePhotoIdentifier(file.path, exiftool)
+        if (identifier && identifiers.has(identifier)) pairedVideos.add(file.path)
+      }
+    }
+    if (sizes.size > 1 && !mixedMedia) {
       stats.conflictGroups++; conflicts.push({ group: normalized, files: files.map((file) => file.filename) })
       emit({ type: 'progress', current: ++groupNumber, total: Math.max(groups.size, 1), label: 'Processing files' }); continue
     }
-    if (live) stats.liveGroups++
-    const processed: { name: string; path: string; extension: string }[] = []
+    if (pairedVideos.size) stats.liveGroups++
+    const processed: { name: string; path: string; pairedVideo: boolean }[] = []
     for (const file of files) {
       let working = file.filename, beDetected = false
       if (options.convertBuddhistEra) { const result = convertBuddhistEraDatePrefix(file.filename); working = result.name; beDetected = result.detected; if (beDetected) stats.beDetected++ }
@@ -91,9 +103,9 @@ export async function processJob(options: JobOptions, emit: (event: JobEvent) =>
         if (path !== file.path && await pathExists(path)) { stats.nameCollisionSkips++; collisions.push({ source: file.path, destination: path }); name = file.filename; path = file.path }
         else { if (!dryRun) await rename(file.path, path); stats.renameActions++ }
       } else { name = file.filename; path = file.path }
-      processed.push({ name, path, extension: file.extension })
+      processed.push({ name, path, pairedVideo: pairedVideos.has(file.path) })
     }
-    if (live && options.moveLivePhotoVideos) for (const file of processed.filter((item) => VIDEO_EXTENSIONS.has(item.extension))) {
+    for (const file of processed.filter((item) => item.pairedVideo)) {
       const destination = join(liveFolder, file.name)
       if (await pathExists(destination)) { stats.liveVideoSkipped++; liveSkips.push(destination) }
       else { if (!dryRun) { await mkdir(liveFolder, { recursive: true }); await rename(file.path, destination) } stats.liveVideoActions++ }
@@ -111,7 +123,7 @@ export async function processJob(options: JobOptions, emit: (event: JobEvent) =>
     `Original metadata matching   : ${sourceMatch ? 'AUTO' : 'OFF'}`, `Copy matched metadata        : ${yn(options.copyMetadata)}`,
     `Sync Finder dates            : ${yn(options.syncFinderDates)}`, `Recursive source search      : ${yn(options.recursiveSource)}`,
     '-------------------------------------------------------', counter('Target files scanned', stats.targetFiles), counter('Source files scanned', stats.sourceFiles),
-    counter('Groups processed', stats.groups), counter('Filename source matches ', stats.matchedTargets), counter('Ambiguous source keys', stats.ambiguousSources),
+    counter('Groups processed', stats.groups), counter('Filename source matches', stats.matchedTargets), counter('Ambiguous source keys', stats.ambiguousSources),
     counter('Source date used for naming', stats.sourceDateUsed), counter(dryRun ? 'Would copy source metadata' : 'Copied source metadata', stats.metadataActions),
     counter('Metadata copy failures', stats.metadataFailures), counter(dryRun ? 'Would sync Finder dates' : 'Synced Finder dates', stats.fsDateActions),
     counter('Finder date warnings', stats.fsDateWarnings), counter('Needs rename', stats.needsRename), counter('B.E. prefixes detected', stats.beDetected),

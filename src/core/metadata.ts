@@ -59,3 +59,14 @@ export async function setFilesystemDates(path: string, date: Date, setFile: stri
 }
 
 export function datePrefix(date: Date) { return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}` }
+
+
+export async function livePhotoIdentifier(path: string, exiftool: string | null): Promise<string | null> {
+  if (!exiftool) return null
+  try {
+    const { stdout } = await execute(exiftool, ['-s3', '-ContentIdentifier', path])
+    return stdout.trim() || null
+  } catch {
+    return null
+  }
+}

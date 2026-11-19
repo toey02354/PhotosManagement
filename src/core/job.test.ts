@@ -1,9 +1,12 @@
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { JobEvent, JobOptions } from '../shared/job'
 import { processJob } from './job'
+import * as metadata from './metadata'
+
+afterEach(() => vi.restoreAllMocks())
 
 const temporary: string[] = []
 afterEach(async () => Promise.all(temporary.splice(0).map((path) => rm(path, { recursive: true, force: true }))))
@@ -31,6 +34,7 @@ describe('Node job engine', () => {
 
   it('renames a B.E. prefix and moves the matching Live Photo video', async () => {
     const target = await folder()
+    vi.spyOn(metadata, 'livePhotoIdentifier').mockResolvedValue('matching-identifier')
     await writeFile(join(target, '25671221-IMG_4697.JPG'), 'still')
     await writeFile(join(target, '25671221-IMG_4697.MOV'), 'video-content')
     const summary = await run(options(target, false))
@@ -38,6 +42,15 @@ describe('Node job engine', () => {
     expect(await readFile(join(target, 'LivePhotos', '20241221-IMG_4697.MOV'), 'utf8')).toBe('video-content')
     expect(summary).toContain('Renamed                      : 2')
     expect(summary).toContain('Moved LivePhoto videos       : 1')
+  })
+
+  it('leaves an unrelated same-name video in place', async () => {
+    const target = await folder()
+    vi.spyOn(metadata, 'livePhotoIdentifier').mockResolvedValueOnce('still-id').mockResolvedValueOnce('video-id')
+    await writeFile(join(target, 'IMG_4697.JPG'), 'still')
+    await writeFile(join(target, 'IMG_4697.MOV'), 'video')
+    await run(options(target, false))
+    expect((await readdir(target)).sort()).toEqual(['IMG_4697.JPG', 'IMG_4697.MOV'])
   })
 
   it('reports different-sized same-base files without moving them', async () => {
