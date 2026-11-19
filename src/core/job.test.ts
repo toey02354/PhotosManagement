@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -40,14 +40,13 @@ describe('Node job engine', () => {
     expect(summary).toContain('Moved LivePhoto videos       : 1')
   })
 
-  it('moves different-sized same-base non-Live files to Conflicts', async () => {
+  it('reports different-sized same-base files without moving them', async () => {
     const target = await folder()
     await writeFile(join(target, 'IMG_0001.jpg'), 'a')
     await writeFile(join(target, 'IMG_0001.png'), 'different')
-    const config = options(target, false); config.convertBuddhistEra = false
+    const config = options(target, false); config.convertBuddhistEra = false; config.moveLivePhotoVideos = false
     const summary = await run(config)
-    expect((await stat(join(target, 'Conflicts', 'IMG_0001.jpg'))).isFile()).toBe(true)
-    expect((await stat(join(target, 'Conflicts', 'IMG_0001.png'))).isFile()).toBe(true)
+    expect((await readdir(target)).sort()).toEqual(['IMG_0001.jpg', 'IMG_0001.png'])
     expect(summary).toContain('Conflict groups              : 1')
   })
 

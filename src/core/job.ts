@@ -13,7 +13,7 @@ export async function processJob(options: JobOptions, emit: (event: JobEvent) =>
   const { targetFolder, sourceFolder, dryRun } = options
   const sourceMatch = options.copyMetadata || options.syncFinderDates
   const renameEnabled = options.addDatePrefix || options.convertBuddhistEra
-  const conflictFolder = join(targetFolder, 'Conflicts'), liveFolder = join(targetFolder, 'LivePhotos')
+  const liveFolder = join(targetFolder, 'LivePhotos')
   const [exiftool, setFile] = await Promise.all([findExiftool(), findSetFile()])
 
   emit({ type: 'status', message: 'Scanning target folder…' })
@@ -40,7 +40,7 @@ export async function processJob(options: JobOptions, emit: (event: JobEvent) =>
     ambiguousSources: ambiguous.length, sourceDateUsed: 0, needsRename: 0, renameActions: 0,
     beDetected: 0, beActions: 0, alreadyOk: 0, metadataActions: 0, metadataFailures: 0,
     fsDateActions: 0, fsDateWarnings: 0, liveGroups: 0, liveVideoActions: 0, liveVideoSkipped: 0,
-    conflictGroups: 0, conflictFileActions: 0, missingDate: 0, nameCollisionSkips: 0,
+    conflictGroups: 0, missingDate: 0, nameCollisionSkips: 0,
   }
   const missingDates: string[] = [], metadataErrors: Detail[] = [], fsWarnings: Detail[] = [], liveSkips: string[] = []
   const conflicts: { group: string; files: string[] }[] = [], collisions: { source: string; destination: string }[] = []
@@ -67,11 +67,6 @@ export async function processJob(options: JobOptions, emit: (event: JobEvent) =>
     const live = [...extensions].some((ext) => IMAGE_EXTENSIONS.has(ext)) && [...extensions].some((ext) => VIDEO_EXTENSIONS.has(ext))
     if (sizes.size > 1 && !live) {
       stats.conflictGroups++; conflicts.push({ group: normalized, files: files.map((file) => file.filename) })
-      for (const file of files) {
-        const destination = join(conflictFolder, file.filename)
-        if (dryRun) stats.conflictFileActions++
-        else if (!await pathExists(destination)) { await mkdir(conflictFolder, { recursive: true }); await rename(file.path, destination); stats.conflictFileActions++ }
-      }
       emit({ type: 'progress', current: ++groupNumber, total: Math.max(groups.size, 1), label: 'Processing files' }); continue
     }
     if (live) stats.liveGroups++
@@ -123,7 +118,7 @@ export async function processJob(options: JobOptions, emit: (event: JobEvent) =>
     counter(dryRun ? 'Would convert B.E. prefixes' : 'Converted B.E. prefixes', stats.beActions), counter(dryRun ? 'Would rename' : 'Renamed', stats.renameActions),
     counter('Already correctly named', stats.alreadyOk), counter('Rename collisions skipped', stats.nameCollisionSkips), counter('Live Photo groups', stats.liveGroups),
     counter(dryRun ? 'Would move LivePhoto videos' : 'Moved LivePhoto videos', stats.liveVideoActions), counter('Skipped LivePhoto videos', stats.liveVideoSkipped),
-    counter('Conflict groups', stats.conflictGroups), counter(dryRun ? 'Would move conflict files' : 'Moved conflict files', stats.conflictFileActions),
+    counter('Conflict groups', stats.conflictGroups),
     counter('Missing capture/Created Date', stats.missingDate), '=======================================================',
   ]
   if (dryRun) lines.push('', 'PREVIEW ONLY — no files were changed.')
@@ -133,6 +128,6 @@ export async function processJob(options: JobOptions, emit: (event: JobEvent) =>
   if (missingDates.length) lines.push('', 'MISSING CAPTURE / CREATED DATE', ...missingDates.map((name) => `  - ${name}`))
   if (collisions.length) { lines.push('', 'RENAME COLLISIONS — SKIPPED'); for (const item of collisions) lines.push(`  - ${basename(item.source)} -> ${basename(item.destination)}`) }
   if (liveSkips.length) lines.push('', 'LIVE PHOTO VIDEO DESTINATIONS ALREADY EXIST', ...liveSkips.map((path) => `  - ${path}`))
-  if (conflicts.length) lines.push('', 'CONFLICT GROUPS', ...conflicts.map((item) => `  - ${item.group}: ${item.files.join(', ')}`))
+  if (conflicts.length) lines.push('', 'CONFLICT GROUPS — FILES LEFT IN PLACE', ...conflicts.map((item) => `  - ${item.group}: ${item.files.join(', ')}`))
   emit({ type: 'summary', text: lines.join('\n') }); emit({ type: 'progress', current: 1, total: 1, label: 'Done' }); emit({ type: 'done' })
 }
