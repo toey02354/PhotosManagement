@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import logo from './assets/logo.png'
 import type { JobEvent, JobOptions, JobPreview } from '../shared/job'
 
 const initialOptions: JobOptions = {
@@ -107,7 +108,13 @@ Target: ${options.targetFolder}`))) return
   }
 
   return <main>
-    <header><p className="eyebrow">PHOTO WORKFLOW</p><h1>Photos Management</h1><p>Rename photos, organize Live Photo videos, and restore metadata from originals.</p></header>
+    <header className="app-header">
+      <img src={logo} width="68" height="68" alt="" />
+      <div>
+        <h1>Photos Management</h1>
+        <p>Rename photos, organize Live Photo videos, and restore metadata from originals.</p>
+      </div>
+    </header>
     <div inert={busy}>
     <section><h2>1. Target folder</h2><p>Files to rename, move, or update</p><div className="folder"><input value={options.targetFolder} readOnly placeholder="Choose a folder…"/><button onClick={() => choose('target')}>Choose…</button></div></section>
     <section><h2>2. Rename & organize</h2><div className="checks">{actions.slice(0, 3).map(([key, label]) => <label key={key}><input type="checkbox" checked={options[key]} onChange={(e) => setOptions({ ...options, [key]: e.target.checked })}/>{label}</label>)}</div></section>

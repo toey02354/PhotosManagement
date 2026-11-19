@@ -1,10 +1,11 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeImage } from 'electron'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { mkdir, stat } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { applyPreview, planJob, type PlannedFile } from '../core/job'
 import { UndoHistory } from '../core/undo'
+import dockLogo from '../renderer/assets/logo.png?inline'
 import type { JobEvent, JobOptions } from '../shared/job'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
@@ -34,6 +35,7 @@ function createWindow(): void {
 if (!app.requestSingleInstanceLock()) app.quit()
 
 app.whenReady().then(async () => {
+  if (process.platform === 'darwin') app.dock?.setIcon(nativeImage.createFromDataURL(dockLogo))
   const userData = app.getPath('userData')
   await mkdir(userData, { recursive: true })
   const history = new UndoHistory(join(userData, 'last-file-run.json'))
