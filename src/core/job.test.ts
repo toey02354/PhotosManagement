@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { JobEvent, JobOptions } from '../shared/job'
-import { processJob } from './job'
+import { applyPreview, planJob } from './job'
 import * as metadata from './metadata'
 
 afterEach(() => vi.restoreAllMocks())
@@ -18,8 +18,10 @@ const options = (targetFolder: string, dryRun: boolean): JobOptions => ({
 })
 
 async function run(config: JobOptions) {
-  const events: JobEvent[] = []; await processJob(config, (event) => events.push(event))
-  return events.find((event): event is Extract<JobEvent, { type: 'summary' }> => event.type === 'summary')!.text
+  const events: JobEvent[] = []
+  const files = await planJob(config, (event) => events.push(event))
+  if (!config.dryRun) await applyPreview(files, files.map(({ row }) => row.id), (event) => events.push(event))
+  return events.reverse().find((event): event is Extract<JobEvent, { type: 'summary' }> => event.type === 'summary')!.text
 }
 
 describe('Node job engine', () => {
@@ -40,8 +42,7 @@ describe('Node job engine', () => {
     const summary = await run(options(target, false))
     expect(await readFile(join(target, '20241221-IMG_4697.JPG'), 'utf8')).toBe('still')
     expect(await readFile(join(target, 'LivePhotos', '20241221-IMG_4697.MOV'), 'utf8')).toBe('video-content')
-    expect(summary).toContain('Renamed                      : 2')
-    expect(summary).toContain('Moved LivePhoto videos       : 1')
+    expect(summary).toContain('Completed 3 of 3 actions')
   })
 
   it('leaves an unrelated same-name video in place', async () => {
@@ -60,7 +61,7 @@ describe('Node job engine', () => {
     const config = options(target, false); config.convertBuddhistEra = false; config.moveLivePhotoVideos = false
     const summary = await run(config)
     expect((await readdir(target)).sort()).toEqual(['IMG_0001.jpg', 'IMG_0001.png'])
-    expect(summary).toContain('Conflict groups              : 1')
+    expect(summary).toContain('Completed 0 of 0 actions')
   })
 
   it('reserves a rename destination once in preview and in the actual run', async () => {
@@ -73,9 +74,19 @@ describe('Node job engine', () => {
     expect(preview).toContain('Would rename                 : 1')
     expect(preview).toContain('Rename collisions skipped    : 1')
     const result = await run({ ...config, dryRun: false })
-    expect(result).toContain('Renamed                      : 1')
-    expect(result).toContain('Rename collisions skipped    : 1')
+    expect(result).toContain('Completed 1 of 1 actions')
     expect(await readdir(target)).toHaveLength(2)
+  })
+
+  it('applies only selected, unchanged files from the reviewed preview', async () => {
+    const target = await folder()
+    const names = ['25671221-IMG_1111.JPG', '25671221-IMG_2222.JPG', '25671221-IMG_3333.JPG']
+    for (const name of names) await writeFile(join(target, name), 'original')
+    const files = await planJob(options(target, true), () => {})
+    expect(files.find(({ row }) => row.current === names[0])?.row.proposed).toBe('20241221-IMG_1111.JPG')
+    await writeFile(join(target, names[1]), 'changed after preview')
+    await applyPreview(files, names.slice(0, 2).map((name) => join(target, name)), () => {})
+    expect((await readdir(target)).sort()).toEqual(['20241221-IMG_1111.JPG', names[1], names[2]])
   })
 
   it('matches an _Original source for Finder date synchronization', async () => {

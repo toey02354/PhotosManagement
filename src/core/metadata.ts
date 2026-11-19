@@ -27,17 +27,17 @@ export function parseExiftoolDate(value: string): Date | null {
   return Number.isNaN(date.valueOf()) ? null : date
 }
 
-export async function getBestCreatedDate(path: string, exiftool: string | null): Promise<Date | null> {
+export async function getBestCreatedDate(path: string, exiftool: string | null, onSource?: (source: string) => void): Promise<Date | null> {
   if (exiftool) try {
     const output = (await execute(exiftool, ['-s3', '-DateTimeOriginal', '-CreateDate', '-MediaCreateDate', '-TrackCreateDate', path], { maxBuffer: 1024 * 1024 })).stdout
-    for (const line of output.split(/\r?\n/)) { const date = parseExiftoolDate(line); if (date) return date }
+    for (const line of output.split(/\r?\n/)) { const date = parseExiftoolDate(line); if (date) { onSource?.('Embedded capture date'); return date } }
   } catch { /* Fall through. */ }
   if (process.platform === 'darwin') try {
     const value = (await execute('mdls', ['-raw', '-name', 'kMDItemContentCreationDate', path])).stdout.trim()
     const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2}) ([+-]\d{4})$/.exec(value)
-    if (match) { const date = new Date(`${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}${match[7].slice(0, 3)}:${match[7].slice(3)}`); if (!Number.isNaN(date.valueOf())) return date }
+    if (match) { const date = new Date(`${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}${match[7].slice(0, 3)}:${match[7].slice(3)}`); if (!Number.isNaN(date.valueOf())) { onSource?.('Spotlight content creation date'); return date } }
   } catch { /* Fall through. */ }
-  try { const details = await stat(path); return details.birthtimeMs > 0 ? details.birthtime : null } catch { return null }
+  try { const details = await stat(path); if (details.birthtimeMs > 0) { onSource?.('Filesystem creation date'); return details.birthtime } return null } catch { return null }
 }
 
 export async function copyEmbeddedMetadata(source: string, target: string, exiftool: string): Promise<string | null> {

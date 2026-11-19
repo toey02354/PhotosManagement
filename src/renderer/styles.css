@@ -28,3 +28,9 @@ button:disabled { opacity: .42; cursor: not-allowed; }
 .progress-row progress { width: 100%; height: 8px; accent-color: #426249; }
 .summary pre { min-height: 72px; margin: 14px 0 0; padding: 14px; overflow: auto; white-space: pre-wrap; color: #dce8dc; background: #1e2820; border-radius: 9px; font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
 @media (max-width: 640px) { main { width: min(100% - 24px, 920px); padding-top: 24px; } .folder, .run { flex-wrap: wrap; } .folder input { flex-basis: 100%; } .run button { flex: 1; } }
+
+.preview-table { max-height: 440px; overflow: auto; }
+.preview-table table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+.preview-table th, .preview-table td { padding: 8px; border-bottom: 1px solid #d9ded3; overflow-wrap: anywhere; }
+.preview-table th { position: sticky; top: 0; background: #fafbf7; }
+.preview-table input { accent-color: #426249; }

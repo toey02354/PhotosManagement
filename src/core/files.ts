@@ -77,3 +77,20 @@ export async function matchTargetsToSources(targets: FileRecord[], sources: Map<
   }
   return matches
 }
+
+
+export async function fileIdentity(path: string) {
+  const stat = await lstat(path, { bigint: true })
+  if (!stat.isFile()) throw new Error('Expected a regular file.')
+  return {
+    device: String(stat.dev), inode: String(stat.ino), birth: String(stat.birthtimeNs),
+    size: String(stat.size), modified: String(stat.mtimeNs),
+  }
+}
+
+export type FileIdentity = Awaited<ReturnType<typeof fileIdentity>>
+
+export function sameFile(a: FileIdentity, b: FileIdentity): boolean {
+  return a.device === b.device && a.inode === b.inode && a.birth === b.birth
+    && a.size === b.size && a.modified === b.modified
+}

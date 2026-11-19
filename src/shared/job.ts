@@ -10,6 +10,20 @@ export interface JobOptions {
   recursiveSource: boolean
 }
 
+export interface PreviewRow {
+  id: string
+  current: string
+  proposed: string
+  dateSource?: string
+  actions: string[]
+  notes: string[]
+}
+
+export interface JobPreview {
+  id: string
+  rows: PreviewRow[]
+}
+
 export type JobEvent =
   | { type: 'status'; message: string }
   | { type: 'progress'; current: number; total: number; label: string }
@@ -19,7 +33,7 @@ export type JobEvent =
 
 export interface PhotosApi {
   chooseFolder: (kind: 'target' | 'source') => Promise<string | null>
-  preview: (options: JobOptions) => Promise<void>
-  run: (options: JobOptions) => Promise<void>
+  preview: (options: JobOptions) => Promise<JobPreview | null>
+  run: (previewId: string, selected: string[]) => Promise<void>
   onJobEvent: (listener: (event: JobEvent) => void) => () => void
 }

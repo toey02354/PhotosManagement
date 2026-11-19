@@ -2,7 +2,8 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { stat } from 'node:fs/promises'
-import { processJob } from '../core/job'
+import { randomUUID } from 'node:crypto'
+import { applyPreview, planJob, type PlannedFile } from '../core/job'
 import type { JobEvent, JobOptions } from '../shared/job'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
@@ -41,26 +42,38 @@ app.whenReady().then(() => {
   })
 
   let jobRunning = false
-  const startJob = async (event: Electron.IpcMainInvokeEvent, options: JobOptions, dryRun: boolean) => {
+  let preview: { id: string; sender: number; files: PlannedFile[] } | null = null
+  const withJob = async <T>(event: Electron.IpcMainInvokeEvent, work: (emit: (jobEvent: JobEvent) => void) => Promise<T>) => {
     if (jobRunning) throw new Error('Another Photos Management job is already running.')
     jobRunning = true
     const emit = (jobEvent: JobEvent) => {
       if (!event.sender.isDestroyed()) event.sender.send('job:event', jobEvent)
     }
     try {
-      if (!(await stat(options.targetFolder)).isDirectory()) throw new Error('Please choose a valid Target Folder.')
-      if ((options.copyMetadata || options.syncFinderDates) && !(await stat(options.sourceFolder)).isDirectory()) {
-        throw new Error('Please choose a valid Metadata Source Folder.')
-      }
-      await processJob({ ...options, dryRun }, emit)
-    } catch (error) {
-      emit({ type: 'error', message: error instanceof Error ? error.message : String(error) })
+      return await work(emit)
     } finally {
       jobRunning = false
     }
   }
-  ipcMain.handle('job:preview', (event, options: JobOptions) => startJob(event, options, true))
-  ipcMain.handle('job:run', (event, options: JobOptions) => startJob(event, options, false))
+  ipcMain.handle('job:preview', (event, options: JobOptions) => withJob(event, async (emit) => {
+    preview = null
+    if (!(await stat(options.targetFolder)).isDirectory()) throw new Error('Please choose a valid Target Folder.')
+    if ((options.copyMetadata || options.syncFinderDates) && !(await stat(options.sourceFolder)).isDirectory()) {
+      throw new Error('Please choose a valid Metadata Source Folder.')
+    }
+    const files = await planJob(options, emit)
+    const id = randomUUID()
+    preview = { id, sender: event.sender.id, files }
+    return { id, rows: files.map(({ row }) => row) }
+  }))
+  ipcMain.handle('job:run', (event, id: string, selected: string[]) => withJob(event, async (emit) => {
+    if (!preview || preview.id !== id || preview.sender !== event.sender.id) {
+      throw new Error('Create a new preview before running.')
+    }
+    const { files } = preview
+    preview = null
+    await applyPreview(files, selected, emit)
+  }))
 
   createWindow()
   app.on('activate', () => {
