@@ -1,9 +1,10 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { stat } from 'node:fs/promises'
+import { mkdir, stat } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { applyPreview, planJob, type PlannedFile } from '../core/job'
+import { UndoHistory } from '../core/undo'
 import type { JobEvent, JobOptions } from '../shared/job'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
@@ -32,7 +33,10 @@ function createWindow(): void {
 
 if (!app.requestSingleInstanceLock()) app.quit()
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  const userData = app.getPath('userData')
+  await mkdir(userData, { recursive: true })
+  const history = new UndoHistory(join(userData, 'last-file-run.json'))
   ipcMain.handle('folder:choose', async (_event, kind: 'target' | 'source') => {
     const result = await dialog.showOpenDialog({
       title: kind === 'target' ? 'Choose Target Folder' : 'Choose Metadata Source Folder',
@@ -72,7 +76,12 @@ app.whenReady().then(() => {
     }
     const { files } = preview
     preview = null
-    await applyPreview(files, selected, emit)
+    await applyPreview(files, selected, emit, history.startRun())
+  }))
+  ipcMain.handle('job:undo-count', () => history.count())
+  ipcMain.handle('job:undo', (event) => withJob(event, () => {
+    preview = null
+    return history.undo()
   }))
 
   createWindow()

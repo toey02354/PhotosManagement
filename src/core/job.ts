@@ -225,7 +225,9 @@ export async function planJob(options: JobOptions, emit: (event: JobEvent) => vo
   return [...plan.values()]
 }
 
-export async function applyPreview(files: PlannedFile[], selected: string[], emit: (event: JobEvent) => void) {
+export async function applyPreview(files: PlannedFile[], selected: string[], emit: (event: JobEvent) => void,
+  move = moveWithoutReplacing,
+) {
   const selection = new Set(selected)
   const rows = files.filter(({ row, operations }) => selection.has(row.id) && operations.length)
   const [exiftool, setFile] = await Promise.all([findExiftool(), findSetFile()])
@@ -245,7 +247,7 @@ export async function applyPreview(files: PlannedFile[], selected: string[], emi
         const folder = dirname(operation.destination)
         await mkdir(folder, { recursive: true })
         if (!(await lstat(folder)).isDirectory()) throw new Error('Destination must be a regular directory.')
-        if (!await moveWithoutReplacing(state.current, operation.destination)) {
+        if (!await move(state.current, operation.destination)) {
           throw new Error(`Destination already exists: ${operation.destination}`)
         }
         state.current = operation.destination

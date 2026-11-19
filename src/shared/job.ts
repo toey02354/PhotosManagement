@@ -35,5 +35,15 @@ export interface PhotosApi {
   chooseFolder: (kind: 'target' | 'source') => Promise<string | null>
   preview: (options: JobOptions) => Promise<JobPreview | null>
   run: (previewId: string, selected: string[]) => Promise<void>
+  undoCount: () => Promise<number>
+  undo: () => Promise<UndoResult>
   onJobEvent: (listener: (event: JobEvent) => void) => () => void
+}
+
+
+export interface UndoResult {
+  restored: number
+  cleared: number
+  remaining: number
+  warnings: string[]
 }

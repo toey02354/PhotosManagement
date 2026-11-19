@@ -11,6 +11,7 @@ export default function App() {
   const [options, setOptions] = useState(initialOptions)
   const [summary, setSummary] = useState('Choose folders and options, then preview the changes.')
   const [busy, setBusy] = useState(false)
+  const [undoCount, setUndoCount] = useState(0)
   const [status, setStatus] = useState('Ready')
   const [progress, setProgress] = useState(0)
   const [preview, setPreview] = useState<{ result: JobPreview; options: JobOptions } | null>(null)
@@ -29,6 +30,39 @@ export default function App() {
     if (event.type === 'error') { setSummary(event.message); setStatus('Error') }
     if (event.type === 'done') { setStatus('Done'); setProgress(100) }
   }), [])
+
+  useEffect(() => {
+    void window.photos.undoCount().then(setUndoCount).catch((error: unknown) => setSummary(String(error)))
+  }, [])
+
+  const refreshUndo = async () => {
+    try { setUndoCount(await window.photos.undoCount()) }
+    catch (error) { setSummary(String(error)); setStatus('Error') }
+  }
+
+  const undo = async () => {
+    if (!window.confirm('Undo the last run’s file renames and moves? Metadata and Finder date edits will stay as applied.')) return
+    setBusy(true)
+    setPreview(null)
+    setProgress(0)
+    setStatus('Undoing file changes…')
+    try {
+      const result = await window.photos.undo()
+      setUndoCount(result.remaining)
+      setSummary([
+        `Reversed ${result.restored} file operations. ${result.cleared} were already at their original paths.`,
+        ...result.warnings,
+      ].join('\n'))
+      setStatus(result.remaining ? 'Undo incomplete' : 'Undo complete')
+      setProgress(100)
+    } catch (error) {
+      setSummary(String(error))
+      setStatus('Error')
+      await refreshUndo()
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const actions = useMemo(() => [
     ['addDatePrefix', 'Add / refresh YYYYMMDD- from capture / Created Date'],
@@ -67,6 +101,7 @@ Target: ${options.targetFolder}`))) return
       setSummary(String(error))
       setStatus('Error')
     } finally {
+      if (!dryRun) await refreshUndo()
       setBusy(false)
     }
   }
@@ -78,7 +113,7 @@ Target: ${options.targetFolder}`))) return
     <section><h2>2. Rename & organize</h2><div className="checks">{actions.slice(0, 3).map(([key, label]) => <label key={key}><input type="checkbox" checked={options[key]} onChange={(e) => setOptions({ ...options, [key]: e.target.checked })}/>{label}</label>)}</div></section>
     <section><h2>3. Restore metadata <span>optional</span></h2><div className="checks">{actions.slice(3).map(([key, label]) => <label key={key} className={key === 'recursiveSource' && !needsSource ? 'disabled' : ''}><input type="checkbox" checked={options[key]} disabled={key === 'recursiveSource' && !needsSource} onChange={(e) => setOptions({ ...options, [key]: e.target.checked })}/>{label}</label>)}</div>{needsSource && <div className="folder"><input value={options.sourceFolder} readOnly placeholder="Choose the folder containing originals…"/><button onClick={() => choose('source')}>Choose…</button><button className="quiet" onClick={() => setOptions({ ...options, sourceFolder: options.targetFolder })}>Use target</button></div>}</section>
     </div>
-    <div className="run"><button className="preview" disabled={!canStart} onClick={() => start(true)}>Preview changes</button><button className="primary" disabled={!canStart || !rows || !selected.size} onClick={() => start(false)}>Run selected</button></div>
+    <div className="run"><button className="quiet" disabled={busy || !undoCount} onClick={() => void undo()}>Undo last run</button><button className="preview" disabled={!canStart} onClick={() => start(true)}>Preview changes</button><button className="primary" disabled={!canStart || !rows || !selected.size} onClick={() => start(false)}>Run selected</button></div>
     <div className="progress-row"><span>{status}</span><progress value={progress} max="100" /></div>
     {rows && <section>
       <h2>File preview</h2>
