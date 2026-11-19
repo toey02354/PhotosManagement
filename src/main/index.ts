@@ -29,6 +29,8 @@ function createWindow(): void {
   }
 }
 
+if (!app.requestSingleInstanceLock()) app.quit()
+
 app.whenReady().then(() => {
   ipcMain.handle('folder:choose', async (_event, kind: 'target' | 'source') => {
     const result = await dialog.showOpenDialog({
@@ -38,20 +40,27 @@ app.whenReady().then(() => {
     return result.canceled ? null : result.filePaths[0] ?? null
   })
 
-  const startJob = async (event: Electron.IpcMainInvokeEvent, options: JobOptions) => {
-    const emit = (jobEvent: JobEvent) => event.sender.send('job:event', jobEvent)
+  let jobRunning = false
+  const startJob = async (event: Electron.IpcMainInvokeEvent, options: JobOptions, dryRun: boolean) => {
+    if (jobRunning) throw new Error('Another Photos Management job is already running.')
+    jobRunning = true
+    const emit = (jobEvent: JobEvent) => {
+      if (!event.sender.isDestroyed()) event.sender.send('job:event', jobEvent)
+    }
     try {
       if (!(await stat(options.targetFolder)).isDirectory()) throw new Error('Please choose a valid Target Folder.')
       if ((options.copyMetadata || options.syncFinderDates) && !(await stat(options.sourceFolder)).isDirectory()) {
         throw new Error('Please choose a valid Metadata Source Folder.')
       }
-      await processJob(options, emit)
+      await processJob({ ...options, dryRun }, emit)
     } catch (error) {
       emit({ type: 'error', message: error instanceof Error ? error.message : String(error) })
+    } finally {
+      jobRunning = false
     }
   }
-  ipcMain.handle('job:preview', startJob)
-  ipcMain.handle('job:run', startJob)
+  ipcMain.handle('job:preview', (event, options: JobOptions) => startJob(event, options, true))
+  ipcMain.handle('job:run', (event, options: JobOptions) => startJob(event, options, false))
 
   createWindow()
   app.on('activate', () => {

@@ -1,5 +1,4 @@
-import { access, readdir, realpath, stat } from 'node:fs/promises'
-import { constants } from 'node:fs'
+import { link, lstat, readdir, realpath, stat, unlink } from 'node:fs/promises'
 import { extname, join } from 'node:path'
 import { iphoneSequenceKey, isAuthoritativeIphoneOriginal } from './filename'
 
@@ -11,7 +10,24 @@ export interface FileRecord { filename: string; path: string; extension: string;
 export interface AmbiguousSource { key: string; sources: string[] }
 
 export async function pathExists(path: string): Promise<boolean> {
-  try { await access(path, constants.F_OK); return true } catch { return false }
+  try {
+    await lstat(path)
+    return true
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
+    throw error
+  }
+}
+
+export async function moveWithoutReplacing(source: string, destination: string): Promise<boolean> {
+  try {
+    await link(source, destination)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false
+    throw error
+  }
+  await unlink(source)
+  return true
 }
 
 export async function scanFolder(folder: string, recursive = false): Promise<FileRecord[]> {

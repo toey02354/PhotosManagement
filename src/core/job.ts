@@ -1,8 +1,8 @@
-import { mkdir, rename } from 'node:fs/promises'
+import { lstat, mkdir } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import type { JobEvent, JobOptions } from '../shared/job'
 import { convertBuddhistEraDatePrefix, normalizeFilename, stripDatePrefix } from './filename'
-import { buildSourceIndex, IMAGE_EXTENSIONS, matchTargetsToSources, pathExists, scanFolder, VIDEO_EXTENSIONS, type FileRecord } from './files'
+import { buildSourceIndex, IMAGE_EXTENSIONS, matchTargetsToSources, moveWithoutReplacing, pathExists, scanFolder, VIDEO_EXTENSIONS, type FileRecord } from './files'
 import { copyEmbeddedMetadata, datePrefix, findExiftool, findSetFile, getBestCreatedDate, livePhotoIdentifier, setFilesystemDates } from './metadata'
 
 type Detail = { target: string; source?: string; error?: string; warning?: string }
@@ -100,15 +100,21 @@ export async function processJob(options: JobOptions, emit: (event: JobEvent) =>
       let name = needsRename && renameEnabled ? nextName : file.filename
       let path = join(targetFolder, name)
       if (needsRename && renameEnabled) {
-        if (path !== file.path && await pathExists(path)) { stats.nameCollisionSkips++; collisions.push({ source: file.path, destination: path }); name = file.filename; path = file.path }
-        else { if (!dryRun) await rename(file.path, path); stats.renameActions++ }
+        if (await pathExists(path) || (!dryRun && !await moveWithoutReplacing(file.path, path))) { stats.nameCollisionSkips++; collisions.push({ source: file.path, destination: path }); name = file.filename; path = file.path }
+        else stats.renameActions++
       } else { name = file.filename; path = file.path }
       processed.push({ name, path, pairedVideo: pairedVideos.has(file.path) })
     }
     for (const file of processed.filter((item) => item.pairedVideo)) {
       const destination = join(liveFolder, file.name)
-      if (await pathExists(destination)) { stats.liveVideoSkipped++; liveSkips.push(destination) }
-      else { if (!dryRun) { await mkdir(liveFolder, { recursive: true }); await rename(file.path, destination) } stats.liveVideoActions++ }
+      if (!dryRun) {
+        await mkdir(liveFolder, { recursive: true })
+        if (!(await lstat(liveFolder)).isDirectory()) throw new Error('LivePhotos must be a regular directory.')
+      }
+      if (await pathExists(destination) || (!dryRun && !await moveWithoutReplacing(file.path, destination))) {
+        stats.liveVideoSkipped++
+        liveSkips.push(destination)
+      } else stats.liveVideoActions++
     }
     emit({ type: 'progress', current: ++groupNumber, total: Math.max(groups.size, 1), label: 'Processing files' })
   }
