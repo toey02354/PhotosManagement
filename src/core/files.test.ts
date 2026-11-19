@@ -4,12 +4,12 @@ import { buildSourceIndex, type FileRecord } from './files'
 const record = (filename: string, extension: string, path = filename): FileRecord => ({ filename, extension, path, size: 1 })
 
 describe('source indexing', () => {
-  it('prefers HEIC over lower-priority canonical originals', () => {
+  it('skips competing originals across formats', () => {
     const result = buildSourceIndex([
       record('IMG_0415.jpg', '.jpg'), record('IMG_0415.HEIC', '.heic'),
     ])
-    expect(result.sourceByKey.get('IMG_0415')?.filename).toBe('IMG_0415.HEIC')
-    expect(result.ambiguous).toEqual([])
+    expect(result.sourceByKey.has('IMG_0415')).toBe(false)
+    expect(result.ambiguous[0].sources).toHaveLength(2)
   })
 
   it('marks equally preferred originals as ambiguous', () => {
@@ -26,7 +26,7 @@ describe('source indexing', () => {
     expect(buildSourceIndex([record('IMG_0415-edit.jpg', '.jpg')]).sourceByKey.size).toBe(0)
   })
 
-  it('uses a Live Photo video only when no still original exists', () => {
+  it('allows a unique video source and skips competing matches', () => {
     const videoOnly = buildSourceIndex([record('IMG_2741_Original.mov', '.mov')])
     expect(videoOnly.sourceByKey.get('IMG_2741')?.filename).toBe('IMG_2741_Original.mov')
 
@@ -34,6 +34,6 @@ describe('source indexing', () => {
       record('IMG_2741_Original.mov', '.mov'),
       record('IMG_2741_Original.HEIC', '.heic'),
     ])
-    expect(withStill.sourceByKey.get('IMG_2741')?.filename).toBe('IMG_2741_Original.HEIC')
+    expect(withStill.ambiguous[0].sources).toHaveLength(2)
   })
 })

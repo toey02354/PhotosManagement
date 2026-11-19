@@ -59,7 +59,7 @@ describe('Node job engine', () => {
     config.sourceFolder = source
     config.syncFinderDates = true
     const summary = await run(config)
-    expect(summary).toContain('Confident source matches     : 1')
+    expect(summary).toContain('Filename source matches      : 1')
     expect(summary).toContain('Would sync Finder dates      : 1')
   })
 
@@ -72,7 +72,7 @@ describe('Node job engine', () => {
     config.sourceFolder = source
     config.syncFinderDates = true
     const summary = await run(config)
-    expect(summary).toContain('Confident source matches     : 1')
+    expect(summary).toContain('Filename source matches      : 1')
     expect(summary).toContain('Would sync Finder dates      : 1')
   })
 })

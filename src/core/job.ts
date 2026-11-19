@@ -111,7 +111,7 @@ export async function processJob(options: JobOptions, emit: (event: JobEvent) =>
     `Original metadata matching   : ${sourceMatch ? 'AUTO' : 'OFF'}`, `Copy matched metadata        : ${yn(options.copyMetadata)}`,
     `Sync Finder dates            : ${yn(options.syncFinderDates)}`, `Recursive source search      : ${yn(options.recursiveSource)}`,
     '-------------------------------------------------------', counter('Target files scanned', stats.targetFiles), counter('Source files scanned', stats.sourceFiles),
-    counter('Groups processed', stats.groups), counter('Confident source matches', stats.matchedTargets), counter('Ambiguous source keys', stats.ambiguousSources),
+    counter('Groups processed', stats.groups), counter('Filename source matches ', stats.matchedTargets), counter('Ambiguous source keys', stats.ambiguousSources),
     counter('Source date used for naming', stats.sourceDateUsed), counter(dryRun ? 'Would copy source metadata' : 'Copied source metadata', stats.metadataActions),
     counter('Metadata copy failures', stats.metadataFailures), counter(dryRun ? 'Would sync Finder dates' : 'Synced Finder dates', stats.fsDateActions),
     counter('Finder date warnings', stats.fsDateWarnings), counter('Needs rename', stats.needsRename), counter('B.E. prefixes detected', stats.beDetected),

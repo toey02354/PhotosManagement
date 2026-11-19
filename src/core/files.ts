@@ -31,13 +31,6 @@ export async function scanFolder(folder: string, recursive = false): Promise<Fil
   return records
 }
 
-function sourcePriority(extension: string): number {
-  return ({
-    '.heic': 0, '.dng': 1, '.jpg': 2, '.jpeg': 2, '.tif': 3, '.tiff': 3, '.png': 4,
-    '.mov': 10, '.mp4': 11, '.m4v': 12,
-  } as Record<string, number>)[extension] ?? 99
-}
-
 export function buildSourceIndex(records: FileRecord[]) {
   const candidates = new Map<string, FileRecord[]>()
   for (const record of records) {
@@ -48,10 +41,8 @@ export function buildSourceIndex(records: FileRecord[]) {
   const sourceByKey = new Map<string, FileRecord>()
   const ambiguous: AmbiguousSource[] = []
   for (const [key, values] of candidates) {
-    const priority = Math.min(...values.map((value) => sourcePriority(value.extension)))
-    const best = values.filter((value) => sourcePriority(value.extension) === priority)
-    if (best.length === 1) sourceByKey.set(key, best[0])
-    else ambiguous.push({ key, sources: best.map((value) => value.path) })
+    if (values.length === 1) sourceByKey.set(key, values[0])
+    else ambiguous.push({ key, sources: values.map((value) => value.path) })
   }
   return { sourceByKey, ambiguous }
 }
@@ -62,6 +53,9 @@ export async function matchTargetsToSources(targets: FileRecord[], sources: Map<
     const key = IMAGE_EXTENSIONS.has(target.extension) ? iphoneSequenceKey(target.filename) : null
     const source = key ? sources.get(key) : undefined
     if (!source) continue
+    const targetDate = /^\d{8}(?=-)/.exec(target.filename)?.[0]
+    const sourceDate = /^\d{8}(?=-)/.exec(source.filename)?.[0]
+    if (targetDate && sourceDate && targetDate !== sourceDate) continue
     try { if (await realpath(target.path) === await realpath(source.path)) continue } catch { if (target.path === source.path) continue }
     matches.set(target.path, source.path)
   }
